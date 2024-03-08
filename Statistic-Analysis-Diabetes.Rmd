@@ -1,0 +1,288 @@
+---
+title: 'HIDS6004 Group Project #1'
+subtitle: 'Glucose Level Data Analysis Using Mutliple Linear Regression' 
+author: "Subha Jamal, Sydney Ogden, Youngmin Choi"
+date: "2023-10-23"
+output: html_document
+---
+
+```{r setup, include=TRUE, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## I. Objective
+
+-   To understand the diabetes dataset, and to evaluate whether there are correlations with certain variables (age, blood pressure, skin thickness) and glucose level.
+
+## II. About diabetes and glucose level, and possible factors
+
+-   According to <https://www.cdc.gov/diabetes/basics/getting-tested.html#:~:text=Fasting%20Blood%20Sugar%20Test,higher%20indicates%20you%20have%20diabetes>, fasting blood sugar level (glucose level) is measured and with values equal to or higher than 126 mg/dL, it is indicated that the person has diabetes.
+-   Possible confounders: According to <https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5898168/>, lifestyle habits such as stress, diet, exercise could influence the blood glucose level. These could be considered as confounders as these factors also affect blood pressure as well as skin thickness.
+
+## III. Dataset
+
+-   This dataset is from <https://www.kaggle.com/datasets/nanditapore/healthcare-diabetes>.
+-   There are 2768 objects and 10 variables in this data set.
+-   Columns description
+    -   **Id**: unique identifier for each data entry
+    -   **Pregnancies**: number of pregnancy
+    -   **Glucose**: Plasma glucose concentration over 2 hours in oral glucose tolerance test
+    -   **BloodPressure**: Diastolic blood pressure (mm Hg)
+    -   **SkinThickness**: Triceps skinfold thickness (mm)
+    -   **Insulin**: 2-hour serum insulin (mm U/mL)
+    -   **BMI**: body mass index (weight in kg/height in m\^2)
+    -   **DiabetesPedigreeFunction**: a genetic score of diabetes
+    -   **Age**: age in years
+    -   **Outcome**: binary classification indicating the presence(1) or absence(0) of diabetes
+
+```{r}
+library("readxl")
+library("ggplot2")
+library("gridExtra")
+glucosedata<-read_excel("input/Healthcare-Diabetes.xlsx")
+colnames(glucosedata)
+```
+
+## IV. Exoloratory Data Analysis
+
+### 1) Overall data information
+
+-   **Data structure**: Following information describes the data distribution of each variables such as minimum, maximum, mean values, etc.
+
+```{r}
+head(glucosedata) #the first few rows of the 'glucosedata'.
+tail(glucosedata) #the last few rows
+summary(glucosedata)#overview
+str(glucosedata)
+
+```
+
+-   **Data distribution**: Following histograms and box plots describe the overall data distribution patterns for each columns.
+
+```{r}
+par(mfrow=c(3,3), mar=c(2,4,4,2))
+hist(glucosedata$Pregnancies, main="Pregnancies Distribution")
+hist(glucosedata$Glucose, main="Glucose Distribution")
+hist(glucosedata$BloodPressure, main="BP Distribution")
+hist(glucosedata$SkinThickness, main="Skin Thickness Distribution")
+hist(glucosedata$Insulin, main="Insulin Distribution")
+hist(glucosedata$BMI, main="BMI Distribution")
+hist(glucosedata$DiabetesPedigreeFunction, main="DPF Distribution")
+hist(glucosedata$Age, main="Age Distribution")
+hist(glucosedata$Outcome, main="Outcome Distribution")
+```
+
+```{r}
+par(mfrow=c(3,3), mar=c(2,4,4,2))
+boxplot(glucosedata$Pregnancies, main="Pregnancies Distribution")
+boxplot(glucosedata$Glucose, main="Glucose Distribution")
+boxplot(glucosedata$BloodPressure, main="BP Distribution")
+boxplot(glucosedata$SkinThickness, main="Skin Thickness Distribution")
+boxplot(glucosedata$Insulin, main="Insulin Distribution")
+boxplot(glucosedata$BMI, main="BMI Distribution")
+boxplot(glucosedata$DiabetesPedigreeFunction, main="DPF Distribution")
+boxplot(glucosedata$Age, main="Age Distribution")
+boxplot(glucosedata$Outcome, main="Outcome Distribution")
+```
+
+### 2) Data Analysis
+
+-   For the purpose of this project, we have decided to conduct 2 analyses as follows;
+
+    -   First, we studied the linear correlations between multiple variables (x1=Age, x2=Blood Pressure, x3=Skin Thickness) and the glucose level.
+    -   In addition, we studied if there are indeed a difference in the mean glucose level between the diabetes-diagnosed and undiagnosed groups by comparing using the t-test.
+
+-   Diabetes group VS non-diagnosed group comparison
+
+-   **Data Preprocessing**
+
+    -   **Data Cleaning** : null values and 0 values were filtered and excluded from the analysis
+        -   There were no null values in this dataset
+        -   Considering the attributes, 0 values are not practical values (such as glucose level, blood pressure) and therefore were removed from the analysis.
+
+    ```{r Glucose data cleaning}
+    cleanGlucose <- glucosedata[!is.na(glucosedata$Glucose),] # No Glucose=null values
+    nonzeroGlucose<- glucosedata[!(glucosedata$Glucose==0),] # 18 '0' values filtered
+
+    ```
+
+    ```{r Age data cleaning}
+    cleanAge<-nonzeroGlucose[!is.na(nonzeroGlucose$Age),] # No null Age values
+    nonzeroAge<-nonzeroGlucose[!(nonzeroGlucose$Age==0),] # No 0 values
+
+    ```
+
+    ```{r BP data cleaning}
+
+    cleanBp<-nonzeroAge[!is.na(nonzeroGlucose$BloodPressure),] # No null BP values
+    nonzeroBp<-cleanBp[!(cleanBp$BloodPressure==0),] #125 0 values filtered 
+
+    ```
+
+    ```{r skin thickness data cleaning}
+
+    # Remove rows with null (NA) SkinThickness values
+    cleanST <-nonzeroBp[!is.na(nonzeroBp$SkinThickness),] #no null skin thickness
+
+    # Remove rows with SkinThickness equal to 0
+    nonzeroST <- cleanST[!(cleanST$SkinThickness == 0),] 
+
+    ```
+
+    + **Check for Normality & Data Transformation** : We have checked the normality of residual values of glucose/each variables linear regression to confirm if these variables is appropriate to be used in this analysis.
+    
+        + Based on the above analyses and scientific background findings, we have decided to conduct multiple linear regression analysis on this data set setting Age, Blood Pressure, and Skin Thickness values as independent variables, and Glucose Level as an outcome (dependent variable).
+
+        + Log2-transformed glucose level showed more normality compared to the original data according to histograms, so we have decided to use the log-2 transformed outcome for this analysis.
+
+    ```{r EDA of clean data (Age)}
+    cleanFinal <- nonzeroST # change name for convenience
+
+    par(mfrow=c(1,2))
+    # Age residual normality check
+      
+    residualLm<-lm(Glucose~Age+BloodPressure+SkinThickness, data=cleanFinal)
+    hist(residualLm$residuals, col='grey',
+         main="Residual Normality Check",
+         xlab='Original Data',
+         border='white')
+
+
+    # Age residual normality check (with log-2 transformed glucose level)
+    residualLmLog<-lm(log2(Glucose)~Age+BloodPressure+SkinThickness, data=cleanFinal)
+    hist(residualLmLog$residuals, 
+         col='navy',
+         main="Residual Normality Check(log2)", 
+         xlab='Log-transformed Data',
+         border='white')
+
+    ```
+
+
+
+### 3) Visualization of Inidividual Variable Relationships
+
+-   Individual variables were compared against log-transformed glucose level to evaluate the linear correlation based on scatter plots and regression line.
+
+```{r}
+# Create a scatter plot of Glucose vs. Age
+plot1<-ggplot(cleanFinal, aes(x = Age, y = log2(Glucose))) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "blue")
+  labs(title = "Scatterplot of Glucose VS Age")
+
+# Create a scatter plot of Glucose vs. Blood Pressure
+  plot2<-ggplot(cleanFinal, aes(x = BloodPressure, y = log2(Glucose))) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "blue")
+  labs(title = "Scatterplot of Glucose VS Blood Pressure") 
+  
+# Create a scatter plot of Glucose vs. Skin Thickness
+plot3<-ggplot(cleanFinal, aes(x = SkinThickness, y = log2(Glucose))) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "blue")
+  labs(title = "Scatterplot of Glucose VS SkinThickness")  
+
+## Arrange the three plots in a grid with 3 columns
+grid.arrange(plot1, plot2, plot3, ncol = 3)
+cor(cleanFinal$Age, log2(cleanFinal$Glucose)) # 0.242909
+cor(cleanFinal$BloodPressure, log2(cleanFinal$Glucose)) # 0.1924903
+cor(cleanFinal$SkinThickness, log2(cleanFinal$Glucose)) # 0.2341401
+
+```
+
+-   In addition, in order to check if there are any collinearity between each variables, we evaluated using the scatter plots as below.
+    -   Based on visual evaluation, we have concluded that these variables can be used for analysis.
+
+```{r}
+# Scatter plot of Age vs. Blood Pressure
+plot4<-ggplot(cleanFinal, aes(x = BloodPressure, y = Age)) +
+  geom_point() +
+  labs(title = "Age VS Blood Pressure") + 
+  theme(plot.title = element_text(size = 10), panel.background = element_rect(fill='lightblue'))
+
+# Scatter plot of Age vs. Skin Thickness
+plot5<-  ggplot(cleanFinal, aes(x = SkinThickness, y = Age)) +
+  geom_point() +
+  labs(title = "Age VS SkinThickness") +
+  theme(plot.title = element_text(size = 10), panel.background = element_rect(fill='lightblue'))
+
+# Scatter plot of SkinThickness vs. Blood Pressure
+plot6<-ggplot(cleanFinal, aes(x = BloodPressure, y = SkinThickness)) +
+  geom_point() +
+  labs(title = "SkinThickness VS Blood Pressure") +
+  theme(plot.title = element_text(size = 10),panel.background = element_rect(fill='lightblue'))
+
+# Arrange the scatter plots in a grid with 3 columns for visualization
+grid.arrange(plot4, plot5, plot6, ncol = 3)
+
+```
+
+```{r}
+# Calculate the correlation matrix
+correlation_matrix <- cor(cleanFinal[c("Age", "BloodPressure", "SkinThickness")])
+
+# Print the correlation coefficients
+print(correlation_matrix)
+
+```
+
+-   Age and Blood Pressure have a positive correlation of 0.35 which suggests that as an individuals blood pressure increase, their blood pressure increases as well. There is a moderate tendency for the two variables to increase together.
+
+-   Age and Skin Thickness have a weak negative correlation of 0.18.It is important to note that the strength of this relationship is weak, so the decrease in skin thickness with age is not very noticeable.
+
+-   Blood Pressure and Skin Thickness have a very weak positive correlation of 0.24, implying that there is a weak relationship between these two variables.
+
+### 4) Multiple Linear Regression Analysis
+
+```{r}
+# Fit the multiple linear regression model
+lmAnalysis<-lm(log2(Glucose)~Age+BloodPressure+SkinThickness, data=cleanFinal)
+summary(lmAnalysis) #display the summary
+```
+
+-   **Analysis Result Interpretation**
+    -   The estimated intercept is 6.3167793, indicating that the average log2-transformed glucose level can be estimated at 6.3167793 for people at the age of 0 and blood pressure and skin thickness values of 0.\
+    -   The Age coefficient is 0.0061326 with a low p-value indicating significance. This tells us that we can estimate the average difference of log-transformed glucose level to be 0.0061326 when age is increased by 1 year and we keep blood pressure and skin thickness as constant.\
+    -   The Blood Pressure coefficient is 0.0025289 with a low p-value indicating significance. This tells us that we can estimate the average difference of log-transformed glucose level to be 0.0025289 when blood pressure is increased by 1 and we keep age and skin thickness as constant.
+    -   The Skin Thickness coefficient is 0.0062802 with a low p-value indicating significance. This tells us that we can estimate the average difference of log-transformed glucose level to be 0.0062802 when skin thickness is increased by 1 and we keep age and blood pressure as constant.
+    -   Residual Standard Error: this is to measure the typical prediction error of the summary provided. Concerning this report, it is approximately 0.3433\
+    -   Multiple R-squared: this represents the proportion of variance in the dependent variable (log2 of glucose) that can be explained by the independent variables (age, blood pressure, and skin thickness). This value was 0.1025, and that means that around 10.25% of the variation in glucose levels can be validated by the predictors\
+    -   Adjusted R-squared: (0.1011) this is the modified version of r-squared that covers the number of predictors in the dataset.
+    -   F-Statistic: this tests the overall significance of the data set, which is 73.71, and the p-value is very small (\<2.2e-16), which is an indicator that the data set is entirely statistically significant
+
+### 5) Hypothesis Testing
+
+```{r}
+# Select Glucose levels for diagnosed and non-diagnosed groups
+diagnosed_glucose <- glucosedata$Glucose[glucosedata$Outcome==1]
+nondiagnosed_glucose <- glucosedata$Glucose[glucosedata$Outcome==0]
+
+#histogram comparison
+par(mfrow=c(1,2))
+hist(diagnosed_glucose, main = "Diabetes Patients Glucose Level", col = "blue")
+hist(nondiagnosed_glucose, main = "Control Group Glucose Level", col = "red")
+# Perform a two-sample t-test to compare means
+t.test(diagnosed_glucose, nondiagnosed_glucose)
+```
+
+-   **Analysis Result Interpretation**
+    -   H0 (null hypothesis): There is no difference in mean in log-transformed glucose level between diagnosed and non-diagnosed group.
+    -   Ha (alternative hypothesis): There is significant difference in mean in log-transformed glucose level between diagnosed and non-diagnosed group.
+    -   The mean glucose level in diagnosed patient group is 141.4811, whereas the mean glucose level in non-diagnosed group is 110.4196.
+    -   The difference in log-transformed glucose level between diabetes diagnosed and non-diagnosed group was significant at a significance level of 0.05.
+    -   We are 95% confident that the difference in means between log-transformed glucose level in diagnosed group and log-transformed non-diagnosed group is between 28.69289 and 33.43009.
+    -   The histograms visually show the comparison of the distribution of glucose levels in the patients with diabetes (blue) and the control group (red).
+    -   Two-Sample T-test:
+        -   This test is conducted to compare the averages of glucose levels between the two control groups.
+        -   Results:
+            -   Test statistic (t): 25.722.\
+            -   Degrees of Freedom (df): 1641.4
+            -   P-value (p-value): \<2.2e-16 which is a very small value and as stated before, is strong evidence against the null hypothesis
+
+## V. Summary & Conclusion
+
+-   In this study, we used multiple linear regression to evaluate glucose levels related to multiple variables. This analysis method allowed us to include multiple predictor variables in one analysis, and also to explain a greater portion of the variance in the dependent variable. 
+-   Multiple linear regression analysis results indicate that all independent variables age, blood pressure, and skin thickness are associated with glucose level.
+-   In addition, we have confirmed that there are difference in the mean glucose level between the diagnosed and undiagnosed group.
+-   However, further study may be necessary to understand fully about these factors and their influence on glucose levels.
