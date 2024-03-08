@@ -1,8 +1,6 @@
 ---
-title: 'HIDS6004 Group Project #1'
-subtitle: 'Glucose Level Data Analysis Using Mutliple Linear Regression' 
-author: "Subha Jamal, Sydney Ogden, Youngmin Choi"
-date: "2023-10-23"
+title: 'Glucose Level Data Analysis Using Mutliple Linear Regression'
+subtitle: '' 
 output: html_document
 ---
 
