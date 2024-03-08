@@ -2,7 +2,7 @@
 Analysis of glucose level data using multiple linear regression to explore correlations with age, blood pressure, and skin thickness in a diabetes dataset
 
 **Glucose Level Data Analysis Using Multiple Linear Regression**
-**Date:** 2023-10-23  
+
 
 ---
 
